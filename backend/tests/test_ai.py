@@ -203,9 +203,19 @@ def test_he_may_not_ask_outright_during_the_ride():
     text = system_text(engine.new_game())
     assert "NEVER ask what someone is" in text
     assert "ta7ayol" in text
-    # And the indirect questions he works from are actually listed for him.
-    for clue in ("day3a", "esm el 3ayleh", "madrase", "sayf"):
-        assert clue in text.lower()
+
+
+def test_the_prompt_hands_him_no_ready_made_questions():
+    """A list of example questions makes him recite them every single ride."""
+    text = system_text(engine.new_game())
+    for scripted in (
+        "Min ayya day3a ahlak?",
+        "Shu esm el 3ayleh?",
+        "Ayya madrase rou7t?",
+        "Wein bet2addo el sayf?",
+    ):
+        assert scripted not in text
+    assert "do not work" in text  # he is told to invent his own way in
 
 
 def test_he_names_his_guess_only_at_the_reveal():
