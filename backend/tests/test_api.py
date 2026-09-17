@@ -5,7 +5,7 @@ import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
-from app import service
+from app import config, engine, service
 from app.ai.base import AIError
 from app.main import app
 from app.models import AISuggestion
@@ -61,7 +61,8 @@ def test_start_returns_opening_question_and_neutral_radar(client):
     assert body["history"] == [{"role": "abu_fadi", "text": body["question"]}]
 
 
-def test_confidence_scores_never_cross_the_wire(client, stub):
+def test_confidence_scores_are_never_top_level(client, stub):
+    """Even in debug builds they stay boxed in `debug`, never on the state."""
     start = client.post("/game/start").json()
     body = client.post(
         "/game/answer",
@@ -69,6 +70,29 @@ def test_confidence_scores_never_cross_the_wire(client, stub):
     ).json()
     assert "money_confidence" not in body
     assert "religion_confidence" not in body
+
+
+def test_debug_block_exposes_the_theory_while_enabled(client, monkeypatch):
+    monkeypatch.setattr(config, "EXPOSE_DEBUG", True)
+    provider = StubProvider(money_confidence_change=9, religion_confidence_change=4)
+    monkeypatch.setattr(service, "get_provider", lambda: provider)
+    session = client.post("/game/start").json()["session_id"]
+    body = client.post(
+        "/game/answer", json={"session_id": session, "answer": "Mercedes"}
+    ).json()
+    assert body["debug"]["money_confidence"] == 9
+    assert body["debug"]["religion_confidence"] == 4
+    assert body["debug"]["confidence_threshold"] == engine.CONFIDENCE_END_THRESHOLD
+
+
+def test_debug_block_vanishes_when_disabled(client, stub, monkeypatch):
+    """Flipping the flag is all it takes to ship the game without spoilers."""
+    monkeypatch.setattr(config, "EXPOSE_DEBUG", False)
+    session = client.post("/game/start").json()["session_id"]
+    body = client.post(
+        "/game/answer", json={"session_id": session, "answer": "Hamra"}
+    ).json()
+    assert body["debug"] is None
 
 
 def test_answer_advances_the_ride(client, stub):

@@ -16,6 +16,11 @@ GEMINI_BASE_URL = os.getenv(
     "GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"
 ).strip()
 
+#: Exposes Abu Fadi's hidden theory scores to the client in a `debug` block.
+#: Off by default - seeing the scores gives away the ending. Turn it on while
+#: tuning the prompt, when you need to watch the confidences move.
+EXPOSE_DEBUG = os.getenv("EXPOSE_DEBUG", "false").strip().lower() in {"1", "true", "yes"}
+
 AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "20"))
 AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "1"))
 

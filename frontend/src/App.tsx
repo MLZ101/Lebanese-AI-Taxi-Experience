@@ -1,6 +1,8 @@
 import { AnswerInput } from "./components/AnswerInput";
 import { HistoryLog } from "./components/HistoryLog";
 import { QuestionPanel } from "./components/QuestionPanel";
+import { RadarPanel } from "./components/RadarPanel";
+import { TaxiView } from "./components/TaxiView";
 import { ThinkingBubble } from "./components/ThinkingBubble";
 import { useGame } from "./hooks/useGame";
 
@@ -21,11 +23,16 @@ export default function App() {
 
   return (
     <div className="flex h-dvh flex-col bg-zinc-950 text-zinc-100 lg:flex-row">
-      {/* Left: the taxi itself. Built in phase 5. */}
-      <section className="flex min-h-[30vh] flex-1 items-center justify-center border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 lg:border-r lg:border-b-0">
-        <p className="px-6 text-center text-xs tracking-[0.3em] text-zinc-700 uppercase">
-          taxi view
-        </p>
+      {/* Left: the back seat, with Abu Fadi's dashboard bolted underneath. */}
+      <section className="flex min-h-0 flex-1 flex-col overflow-y-auto border-b border-zinc-800 bg-black lg:border-r lg:border-b-0">
+        <TaxiView
+          mood={state.mood}
+          action={state.driver_action}
+          turn={state.message_count}
+        />
+        <div className="mt-auto border-t border-zinc-800/80 bg-gradient-to-b from-zinc-950 to-black p-4 sm:p-5">
+          <RadarPanel radar={state.radar} messageCount={state.message_count} />
+        </div>
       </section>
 
       {/* Right: the conversation. */}
