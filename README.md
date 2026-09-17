@@ -59,8 +59,8 @@ and are worth keeping:
   tiny sizes only, it is unreadable in a paragraph. `font-term` (VT323) for
   anything the player actually reads, at `text-lg` and up.
 - **Palette sampled from the art.** `--color-taxi`, `--color-cab`, `--color-blood`
-  and friends are lifted off `abu-fadi.jpeg`, so the chrome and the one piece of
-  art look like they shipped together. Add colours there, not inline.
+  and friends are lifted off `abu-fadi.jpeg`, so the chrome and the art look
+  like they shipped together. Add colours there, not inline.
 - **The page has margins.** `Cabinet` in `App.tsx` wraps everything in bezel →
   glass, with scanline, vignette and rolling-line overlays on top. All three are
   `pointer-events-none` and `aria-hidden`.
@@ -135,8 +135,9 @@ carries an etched pictogram plus one engraved word, MONEY / STATUS / DOUBT /
 TIP, coloured to match its own needle arc. Real clusters label FUEL and TEMP;
 this one does the same.
 
-The pictograms are pixel grids in `frontend/src/components/dashIcons.ts`, not
-an icon font - emoji and icon fonts would be the only smooth thing on screen.
+The pictograms are pixel grids in `frontend/src/components/dashIcons.ts`, drawn
+by `PixelIcon.tsx`, not an icon font - emoji and icon fonts would be the only
+smooth thing on screen.
 Each grid is exactly 9x9 and must be drawn at a whole multiple of 9 px (27, 36),
 or the cell edges land on half pixels and the icon turns to mush.
 
@@ -168,15 +169,40 @@ opens immediately.
 
 ## Driver reactions
 
-Mood is the only reaction signal - it drives both the colour of the cabin and
-what Abu Fadi's body does. There is a single piece of art, so the five moods are
-camera moves over it (a glance at the mirror, turning to study you, a greedy
-flare) rather than separate frames. If real frames turn up, only `MOOD_MOTION`
-in `TaxiView.tsx` needs to change.
+Mood is the only reaction signal - it drives the colour of the cabin, what Abu
+Fadi's body does, and which clip comes up. `TaxiView` stacks two layers.
 
-Framer Motion drives those reactions; everything the player must *read* is
-animated in CSS instead, with the base style already the finished state. A
-broken animation layer can cost a flourish, never the game.
+**Underneath, the painting**, always mounted. There is a single piece of art, so
+the five moods are camera moves over it (a glance at the mirror, turning to
+study you, a greedy flare) rather than separate frames, driven by Framer Motion.
+If real frames turn up, only `MOOD_MOTION` needs to change.
+
+**On top, two reaction clips**, chosen by the same mood:
+
+| Mood | Shows |
+|---|---|
+| `curious`, `excited` | `excited-money.mp4` |
+| `suspicious`, `upset` | `upset-suspicious.mp4` |
+| `neutral` | nothing - stays on the painting |
+
+A clip plays once and the painting takes back over when it ends, including
+when the same mood comes up twice running. Both `<video>` elements stay
+mounted and preloaded and are started imperatively; building a fresh one each
+turn stalls on the first frame.
+
+The clips are 1280x720 against the painting's 1024x682, so they are
+`object-cover`ed into the same window rather than letterboxed, and the switch
+is hidden inside a CRT channel change: the tube flares, a tracking bar rolls
+down the glass, and the picture squashes back out of a scanline. That last
+part runs on the layer holding the clips - which must never remount - so it is
+the one flourish driven imperatively rather than by a CSS class on a keyed
+element.
+
+Nothing in that stack is load-bearing. A clip that stalls, errors, or gets
+autoplay refused falls straight back to the painting underneath, which is the
+same rule the rest of the UI follows: everything the player must *read* is
+animated in CSS with the base style already the finished state, so a broken
+animation layer can cost a flourish, never the game.
 
 ## API
 
@@ -221,5 +247,6 @@ frontend/src/components/   TitleScreen (the attract screen)
                            HistoryLog
                            RevealScreen (the Tawa2ef payoff)
                            ModelPicker (which brain drives)
-frontend/src/assets/       abu-fadi.jpeg - the one piece of art
+frontend/src/assets/       abu-fadi.jpeg - the painting
+                           excited-money.mp4, upset-suspicious.mp4 - reactions
 ```

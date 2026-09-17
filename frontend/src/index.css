@@ -336,6 +336,62 @@ button:not(:disabled) {
   animation: crt-roll 7s linear infinite;
 }
 
+/* --- changing channel ---------------------------------------------------
+ * The reaction clips are 16:9 and the painting is 3:2, so a straight swap
+ * shows the seam. Instead the cabinet changes channel: the tube flares, a
+ * tracking bar rolls down the glass, and the picture squashes back out of a
+ * horizontal line - which is what a CRT did, and hides the geometry change
+ * inside something the rest of the UI already does.
+ */
+
+@keyframes channel-flare {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.8;
+  }
+  40% {
+    opacity: 0.12;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes channel-roll {
+  0% {
+    opacity: 0.85;
+    transform: translateY(-40%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(140%);
+  }
+}
+
+/*
+ * The third part of the switch - the picture squashing back out of a
+ * scanline - runs on the layer that holds the preloaded clips, which must
+ * never remount. It is driven imperatively in TaxiView rather than by a class
+ * here; see the comment there.
+ */
+
+.anim-channel-flare {
+  animation: channel-flare 0.5s steps(8, end) both;
+}
+
+.anim-channel-roll {
+  animation: channel-roll 0.5s linear both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-channel-flare,
+  .anim-channel-roll {
+    animation: none;
+  }
+}
+
 /* --- entry animations ---------------------------------------------------
  * Anything the player must READ or CLICK is already in its finished state,
  * and the keyframe only plays it in - so a dead animation layer costs a

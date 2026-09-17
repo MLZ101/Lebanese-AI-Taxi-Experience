@@ -101,7 +101,7 @@ OUTPUT
 Return ONLY one JSON object. No markdown fence, no commentary:
 {
   "question": "your reaction plus exactly one question, in your voice, max 20 words",
-  "thinking": "a muttered aside, under 10 words, e.g. 'Saida... hmmm.' or 'KACHING'",
+  "thinking": "show the humorous thinking in the mind of the Abu Fadi, using lebanese slangs to exaggurate in his mind",
   "mood": "neutral|curious|suspicious|excited|upset",
   "radar_changes": {"money": 0, "status": 0, "suspicion": 0, "tip": 0},
   "money_confidence_change": 0,
