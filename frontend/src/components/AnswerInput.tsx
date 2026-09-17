@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 
-/** The only way to talk back. Locked while Abu Fadi is thinking. */
+/**
+ * The only way to talk back. Locked while Abu Fadi is thinking.
+ *
+ * Styled as a sunken terminal field with a lit prompt caret and a character
+ * budget in the corner, so typing feels like entering your initials on a
+ * high-score table.
+ */
+
+const MAX = 500;
 
 interface Props {
   disabled: boolean;
@@ -25,25 +33,47 @@ export function AnswerInput({ disabled, waiting, onSubmit }: Props) {
   };
 
   return (
-    <div className="flex gap-2">
-      <input
-        ref={inputRef}
-        value={text}
-        disabled={disabled}
-        maxLength={500}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && submit()}
-        placeholder={waiting ? "Abu Fadi is thinking..." : "Say something..."}
-        className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900/80 px-4 py-3 text-zinc-100 placeholder-zinc-600 outline-none transition focus:border-amber-600/70 disabled:opacity-50"
-      />
-      <button
-        type="button"
-        onClick={submit}
-        disabled={disabled || !text.trim()}
-        className="rounded-lg bg-amber-500 px-5 py-3 font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-500"
-      >
-        Reply
-      </button>
+    <div>
+      <div className="flex items-stretch gap-2">
+        <div className="bevel-in relative flex flex-1 items-center gap-2 px-2">
+          <span
+            aria-hidden="true"
+            className={`font-pixel text-[10px] ${
+              disabled ? "text-khaki" : "anim-blink text-cedar"
+            }`}
+          >
+            ▶
+          </span>
+
+          <input
+            ref={inputRef}
+            value={text}
+            disabled={disabled}
+            maxLength={MAX}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            placeholder={waiting ? "ABU FADI IS THINKING..." : "SAY SOMETHING"}
+            aria-label="Your answer"
+            className="min-w-0 flex-1 bg-transparent py-2.5 font-term text-xl text-bone caret-taxi outline-none placeholder:text-khaki disabled:opacity-60 sm:text-2xl"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={submit}
+          disabled={disabled || !text.trim()}
+          className="bevel-gold shrink-0 px-3 font-pixel text-[9px] hover:bg-taxi-hi disabled:border-cab-hi disabled:bg-cab disabled:text-khaki sm:px-5 sm:text-[11px]"
+        >
+          SAY IT
+        </button>
+      </div>
+
+      <div className="mt-1.5 flex justify-between font-pixel text-[6px] text-khaki sm:text-[8px]">
+        <span>[ENTER] TO TALK</span>
+        <span className={text.length > MAX - 50 ? "text-blood" : undefined}>
+          {text.length}/{MAX}
+        </span>
+      </div>
     </div>
   );
 }

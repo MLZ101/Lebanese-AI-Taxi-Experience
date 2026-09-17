@@ -2,7 +2,12 @@ import { useEffect, useRef } from "react";
 
 import type { Turn } from "../types";
 
-/** Everything said so far, oldest first. The current question lives above. */
+/**
+ * Everything said so far, oldest first. The current question lives above.
+ *
+ * Presented as a scrolling transcript window rather than chat bubbles -
+ * speaker tags in the left margin, no rounded anything.
+ */
 
 interface Props {
   history: Turn[];
@@ -17,26 +22,53 @@ export function HistoryLog({ history }: Props) {
 
   // The last entry is the question already shown in the panel above.
   const earlier = history.slice(0, -1);
-  if (earlier.length === 0) return null;
+
+  // Turn one: show the empty log rather than a hole, so the column has the
+  // same shape it will have for the rest of the ride.
+  if (earlier.length === 0) {
+    return (
+      <div className="bevel-in hidden min-h-0 flex-1 overflow-hidden lg:block">
+        <Title />
+        <p className="p-2 font-term text-lg text-khaki">
+          Nothing said yet. The meter is not running.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
-      {earlier.map((turn, i) => (
-        <div
-          key={i}
-          className={
-            turn.role === "passenger"
-              ? "ml-8 rounded-lg bg-zinc-800/60 px-3 py-2 text-zinc-300"
-              : "mr-8 rounded-lg bg-amber-950/30 px-3 py-2 text-amber-100/70"
-          }
-        >
-          <span className="mr-2 text-[10px] tracking-wider text-zinc-500 uppercase">
-            {turn.role === "passenger" ? "you" : "abu fadi"}
-          </span>
-          {turn.text}
-        </div>
-      ))}
-      <div ref={endRef} />
+    <div className="bevel-in min-h-0 flex-1 overflow-hidden">
+      <Title />
+
+      <div className="pix-scroll max-h-40 min-h-0 space-y-1.5 overflow-y-auto p-2 lg:max-h-none">
+        {earlier.map((turn, i) => {
+          const you = turn.role === "passenger";
+          return (
+            <p key={i} className="font-term text-lg leading-tight">
+              <span
+                className={`mr-2 font-pixel text-[7px] ${
+                  you ? "text-sky" : "text-taxi"
+                }`}
+              >
+                {you ? "YOU" : "HIM"}
+              </span>
+              <span className={you ? "text-dust" : "text-bone"}>
+                {turn.text}
+              </span>
+            </p>
+          );
+        })}
+        <div ref={endRef} />
+      </div>
     </div>
+  );
+}
+
+/** The log window's header bar. */
+function Title() {
+  return (
+    <p className="border-b-4 border-cab-hi px-2 py-1 font-pixel text-[6px] text-khaki sm:text-[8px]">
+      ── TRANSCRIPT ──
+    </p>
   );
 }

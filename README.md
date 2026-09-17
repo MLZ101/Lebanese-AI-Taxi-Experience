@@ -4,7 +4,8 @@ A short AI comedy game. You are in the back of Abu Fadi's taxi. He is nosy.
 
 ## Stack
 
-- **Frontend** React + TypeScript + Vite + Tailwind + Framer Motion
+- **Frontend** React + TypeScript + Vite + Tailwind + Framer Motion, styled as
+  a 1997 arcade cabinet (Press Start 2P + VT323, self-hosted via Fontsource)
 - **Backend** Python + FastAPI + Pydantic
 - **AI** Gemini 3 Flash-Lite, behind a small provider abstraction
 - **State** in-memory sessions, no database
@@ -43,11 +44,73 @@ npm run dev                   # http://localhost:5173
 Vite proxies `/game` and `/health` to `127.0.0.1:8000`, so run the backend too.
 No state library - one `useGame` hook holds the whole game.
 
+## The look
+
+Everything is hard-edged on purpose. The rules live in `frontend/src/index.css`
+and are worth keeping:
+
+- **No radius, no blur.** A global `* { border-radius: 0 }` enforces it. Depth
+  comes from `.bevel` / `.bevel-in` / `.bevel-gold` - solid light/dark borders
+  the way Win95 and every console menu of the era did it, never a soft shadow.
+- **Stepped motion.** Animations use `steps(n)` so they read as frames rather
+  than tweens. Same for the driver's camera moves, which are `ease: "linear"`
+  over short durations.
+- **Two fonts.** `font-pixel` (Press Start 2P) for chrome, labels and buttons -
+  tiny sizes only, it is unreadable in a paragraph. `font-term` (VT323) for
+  anything the player actually reads, at `text-lg` and up.
+- **Palette sampled from the art.** `--color-taxi`, `--color-cab`, `--color-blood`
+  and friends are lifted off `abu-fadi.jpeg`, so the chrome and the one piece of
+  art look like they shipped together. Add colours there, not inline.
+- **The page has margins.** `Cabinet` in `App.tsx` wraps everything in bezel →
+  glass, with scanline, vignette and rolling-line overlays on top. All three are
+  `pointer-events-none` and `aria-hidden`.
+
 ## The radar
 
-Four meters, no labels and no numbers - the player is never told what is being
-measured. The panel also fades up as the ride goes on, from barely lit to hard
-to ignore. Meanings live in `backend/app/models.py`; keep them there.
+Four gauges, built as the instrument cluster of an early-2000s car: moulded
+plastic, a strip of brushed aluminium, chrome rings, scale ticks, a red zone at
+the top of every scale, and a needle with mass that overshoots the reading and
+settles back. The cluster fades up as the ride goes on, from barely lit to hard
+to ignore, like dash lights coming up as it gets dark.
+
+**Still no numbers**, but each dial is now named. It began fully unlabelled -
+the player was told nothing - and that turned out to be too hidden to be fun:
+an icon can say *money*, but nothing short of a word separates "how rich he
+thinks you are" from "what he expects to be handed at the end". So every dial
+carries an etched pictogram plus one engraved word, MONEY / STATUS / DOUBT /
+TIP, coloured to match its own needle arc. Real clusters label FUEL and TEMP;
+this one does the same.
+
+The pictograms are pixel grids in `frontend/src/components/DashIcons.tsx`, not
+an icon font - emoji and icon fonts would be the only smooth thing on screen.
+Each grid is exactly 9x9 and must be drawn at a whole multiple of 9 px (27, 36),
+or the cell edges land on half pixels and the icon turns to mush.
+
+Values are 0-100 and engine-owned; see `backend/app/models.py`.
+
+## Thinking out loud
+
+Abu Fadi's `thinking` gets the same billing as the thing he actually says: its
+own panel above the dialogue box, same text size, dashed border where the
+speech box is solid, and the whole panel takes the colour of his mood.
+
+It types itself out. Nothing is genuinely streaming - the backend sends the
+whole turn in one response - so `useTypewriter` replays it character by
+character, which is what makes him look like he is working the thought out
+rather than having had it ready. A turn therefore reads thought-then-answer:
+the question is withheld until the thought finishes, and the answer box stays
+locked that whole time so nobody replies to a question still off screen.
+
+Two things follow from that gating, and both matter if you touch this:
+
+- The hook force-completes on a timer well after it should have ended. The
+  question *and* the input are both waiting on `done`, so a stalled interval
+  would soft-lock the ride rather than just skip an animation.
+- While the request is merely in flight, the previous question stays on screen
+  dimmed rather than vanishing - only a *new* thought mid-type hides it.
+
+Under `prefers-reduced-motion` the whole string appears at once and every gate
+opens immediately.
 
 ## Driver reactions
 
@@ -94,8 +157,12 @@ backend/tests/           52 tests
 frontend/src/types.ts      mirrors PublicState - keep in sync
 frontend/src/api/client.ts typed fetch + ApiError
 frontend/src/hooks/useGame.ts  the entire client state
-frontend/src/components/   TaxiView (the back seat + driver reactions)
-                           RadarPanel (the four unlabelled meters)
-                           QuestionPanel, AnswerInput, ThinkingBubble, HistoryLog
+frontend/src/hooks/useTypewriter.ts  replays a string one character at a time
+frontend/src/components/   TitleScreen (the attract screen)
+                           TaxiView (the back seat + driver reactions)
+                           RadarPanel (the dial cluster), dashIcons, PixelIcon
+                           ThinkingPanel (the thought, typing itself out)
+                           QuestionPanel (the dialogue box), AnswerInput,
+                           HistoryLog
 frontend/src/assets/       abu-fadi.jpeg - the one piece of art
 ```

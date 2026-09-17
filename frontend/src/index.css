@@ -1,5 +1,38 @@
 @import "tailwindcss";
 
+/*
+ * 1997 CABINET STYLING.
+ *
+ * Everything here is hard-edged on purpose: no border radius, no blur, no
+ * soft shadows, no gradients that fade smoothly. Bevels are drawn with solid
+ * light/dark borders the way Win95 and every console menu of the era did it,
+ * and motion is stepped rather than eased so it reads as frames, not tweens.
+ *
+ * The palette is sampled from abu-fadi.jpeg so the chrome and the art look
+ * like they shipped on the same disk.
+ */
+
+@theme {
+  --font-pixel: "Press Start 2P", "Courier New", monospace;
+  --font-term: "VT323", "Courier New", monospace;
+
+  /* Sampled off the cab art. */
+  --color-taxi: #f2c230;
+  --color-taxi-hi: #ffe27a;
+  --color-taxi-dk: #8a6a10;
+  --color-cab: #1b1a14;
+  --color-cab-hi: #2e2c20;
+  --color-night: #0b0b08;
+  --color-khaki: #6b6a4a;
+  --color-sky: #7d96a8;
+  --color-blood: #b02a1f;
+  /* Suspicion, kept clear of the dials' red zone so the two never blur. */
+  --color-rust: #e0701f;
+  --color-cedar: #2f7d3a;
+  --color-bone: #e8e2cf;
+  --color-dust: #9a9480;
+}
+
 html,
 body,
 #root {
@@ -7,23 +40,312 @@ body,
 }
 
 body {
-  background: #09090b;
+  margin: 0;
+  background: #000;
+  color: var(--color-bone);
+  font-family: var(--font-term);
   overscroll-behavior: none;
+  /* Kill sub-pixel smoothing so the pixel fonts stay crunchy. */
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  text-rendering: geometricPrecision;
+}
+
+/* Every bitmap in here is pixel art - never let the browser smooth it. */
+img,
+canvas {
+  image-rendering: pixelated;
+}
+
+/* The era had no rounded corners. */
+* {
+  border-radius: 0 !important;
+}
+
+input,
+button {
+  font-family: inherit;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* Blocky selection, blocky scrollbars. */
+::selection {
+  background: var(--color-taxi);
+  color: #000;
+}
+
+.pix-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-taxi-dk) #000;
+}
+
+.pix-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.pix-scroll::-webkit-scrollbar-track {
+  background: #000;
+  border-left: 2px solid var(--color-cab-hi);
+}
+
+.pix-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-taxi-dk);
+  border: 2px solid var(--color-night);
+}
+
+/* --- bevels -------------------------------------------------------------
+ * .bevel      raised block, light from the top-left
+ * .bevel-in   sunken well, for anything you type into or read out of
+ * .bevel-gold the same in taxi yellow, for the loud chrome
+ */
+
+.bevel {
+  border-style: solid;
+  border-width: 4px;
+  border-color: var(--color-cab-hi) #000 #000 var(--color-cab-hi);
+  background: var(--color-cab);
+}
+
+.bevel-in {
+  border-style: solid;
+  border-width: 4px;
+  border-color: #000 var(--color-cab-hi) var(--color-cab-hi) #000;
+  background: var(--color-night);
+}
+
+.bevel-gold {
+  border-style: solid;
+  border-width: 4px;
+  border-color: var(--color-taxi-hi) var(--color-taxi-dk) var(--color-taxi-dk)
+    var(--color-taxi-hi);
+  background: var(--color-taxi);
+  color: #000;
+}
+
+.bevel-gold:active:not(:disabled) {
+  border-color: var(--color-taxi-dk) var(--color-taxi-hi) var(--color-taxi-hi)
+    var(--color-taxi-dk);
+  /* The whole face sinks a pixel, like a real arcade button. */
+  transform: translate(1px, 1px);
 }
 
 /*
- * Entry animations live in CSS, not JS.
- *
- * Anything the player has to READ or CLICK must be visible even if no
- * animation ever runs, so the base style is the finished state and the
- * keyframe only plays it in. A dead JS animation layer can then cost us a
+ * The thought box. Dashed where the speech box is solid - the old comic
+ * convention - and it borrows its colour from whatever mood is set on the
+ * container, so the whole panel takes on what he is feeling.
+ */
+.thought-box {
+  border-style: dashed;
+  border-width: 3px;
+  border-color: currentColor;
+  background: #07070a;
+}
+
+/* The block caret chasing the text as it types itself out. */
+.caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  background: currentColor;
+  vertical-align: -0.12em;
+}
+
+/* Hard pixel drop-shadow, in steps. No blur allowed. */
+.pix-shadow {
+  text-shadow:
+    3px 3px 0 #000,
+    6px 6px 0 rgba(0, 0, 0, 0.45);
+}
+
+.pix-shadow-sm {
+  text-shadow: 2px 2px 0 #000;
+}
+
+/* Chunky outlined title lettering. */
+.pix-title {
+  color: var(--color-taxi);
+  text-shadow:
+    -3px 0 0 #000,
+    3px 0 0 #000,
+    0 -3px 0 #000,
+    0 3px 0 #000,
+    5px 5px 0 var(--color-taxi-dk),
+    9px 9px 0 #000;
+}
+
+/* --- the dashboard -----------------------------------------------------
+ * The radar is built to read as an instrument cluster out of an early-2000s
+ * car: moulded plastic, a strip of fake brushed aluminium, sunken gauge wells
+ * and an amber backlight. All of it is flat colour and hard edges, so it sits
+ * in the same tube as everything else.
+ */
+
+/* Moulded dashboard plastic - a fine vertical grain over a dark base. */
+.dash-plastic {
+  background-color: #14140e;
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.5) 0 1px,
+      transparent 1px 4px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.035) 0 1px,
+      transparent 1px 3px
+    );
+}
+
+/* The silver trim strip every car of the era had glued across the dash. */
+.dash-trim {
+  background-image: repeating-linear-gradient(
+    90deg,
+    #6f6f68 0 1px,
+    #a8a89e 1px 2px,
+    #55554f 2px 3px,
+    #8c8c83 3px 4px
+  );
+}
+
+/* A gauge sitting behind glass, lit from behind in amber. */
+.gauge-well {
+  background-color: #08080a;
+  background-image: linear-gradient(
+    180deg,
+    rgba(242, 194, 48, 0.09) 0%,
+    rgba(0, 0, 0, 0) 55%
+  );
+  border-style: solid;
+  border-width: 2px;
+  border-color: #000 #3a3a30 #3a3a30 #000;
+}
+
+/* Scale ticks along the top of a gauge, like a fuel gauge's E—F run. */
+.gauge-ticks {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(232, 226, 207, 0.5) 0 1px,
+    transparent 1px 8px
+  );
+}
+
+/* The needle riding the value. Thin, bright, with a hard shadow. */
+.gauge-needle {
+  background: #f4f1e4;
+  box-shadow:
+    -1px 0 0 rgba(0, 0, 0, 0.9),
+    1px 0 0 rgba(0, 0, 0, 0.9);
+  transition: left 420ms steps(8, end);
+}
+
+/* --- round dials -------------------------------------------------------
+ * The gauges are SVG, so they escape the global no-radius rule. They are
+ * drawn with crisp edges and no antialiasing, which leaves the arcs and rings
+ * pleasantly jagged - a PS1-era dashboard rather than a smooth modern one.
+ */
+
+.dial svg {
+  shape-rendering: crispEdges;
+}
+
+/*
+ * A real needle has mass: it overshoots the reading and settles back. The
+ * origin is set in viewBox units so it pivots on the dial's centre, not on
+ * the needle's own bounding box.
+ */
+.dial-needle {
+  transform-box: view-box;
+  transform-origin: 50px 50px;
+  transition: transform 700ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* The bulb behind the dial face. */
+.dial-glow {
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(242, 194, 48, 0.14) 0%,
+    rgba(242, 194, 48, 0) 70%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dial-needle {
+    transition: none;
+  }
+}
+
+/* Lettering stamped into the aluminium trim. */
+.dash-engraved {
+  color: #14140e;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+/* Lettering moulded into the plastic below a dial. */
+.dash-label {
+  text-shadow:
+    0 1px 0 #000,
+    0 -1px 0 rgba(0, 0, 0, 0.8);
+}
+
+/* Tell-tale lamp - dark until something energises it. */
+.lamp {
+  background: #1d1d14;
+  color: #3c3c30;
+}
+
+.lamp-on {
+  color: #000;
+}
+
+/* --- CRT ---------------------------------------------------------------- */
+
+/* Scanlines over the entire cabinet. Decorative, never interactive. */
+.crt-lines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.28) 3px,
+    rgba(0, 0, 0, 0.28) 4px
+  );
+}
+
+/* Tube curvature - darker in the corners than the middle. */
+.crt-vignette {
+  background: radial-gradient(
+    120% 100% at 50% 50%,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+/* A single bright line crawling down the glass. */
+@keyframes crt-roll {
+  from {
+    transform: translateY(-10vh);
+  }
+  to {
+    transform: translateY(105vh);
+  }
+}
+
+.anim-crt-roll {
+  animation: crt-roll 7s linear infinite;
+}
+
+/* --- entry animations ---------------------------------------------------
+ * Anything the player must READ or CLICK is already in its finished state,
+ * and the keyframe only plays it in - so a dead animation layer costs a
  * flourish, never the game.
  */
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -40,10 +362,22 @@ body {
   }
 }
 
+/* A hard on/off blink - the 90s never faded anything. */
 @keyframes blink {
   0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
   100% {
-    opacity: 0.25;
+    opacity: 0;
+  }
+}
+
+@keyframes blink-soft {
+  0%,
+  100% {
+    opacity: 0.3;
   }
   50% {
     opacity: 1;
@@ -51,19 +385,24 @@ body {
 }
 
 .anim-rise {
-  animation: rise 0.45s ease-out both;
+  /* Stepped, so the panel snaps in over 5 frames instead of gliding. */
+  animation: rise 0.25s steps(5, end) both;
 }
 
 .anim-fade {
-  animation: fade-in 0.5s ease-out both;
+  animation: fade-in 0.2s steps(4, end) both;
 }
 
 .anim-fade-late {
-  animation: fade-in 0.5s ease-out 0.45s both;
+  animation: fade-in 0.2s steps(4, end) 0.5s both;
 }
 
 .anim-blink {
-  animation: blink 1.1s ease-in-out infinite;
+  animation: blink 1s steps(1, end) infinite;
+}
+
+.anim-blink-soft {
+  animation: blink-soft 1.1s steps(6, end) infinite;
 }
 
 /* --- taxi atmosphere ---------------------------------------------------- */
@@ -75,13 +414,13 @@ body {
     transform: translate3d(0, 0, 0);
   }
   25% {
-    transform: translate3d(0.4px, -0.6px, 0);
+    transform: translate3d(1px, -1px, 0);
   }
   50% {
-    transform: translate3d(-0.3px, 0.5px, 0);
+    transform: translate3d(-1px, 1px, 0);
   }
   75% {
-    transform: translate3d(0.5px, 0.3px, 0);
+    transform: translate3d(1px, 1px, 0);
   }
 }
 
@@ -118,11 +457,11 @@ body {
 @keyframes kaching-pop {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.4);
+    transform: translate(-50%, -50%) scale(0.5);
   }
   30% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1.25);
+    transform: translate(-50%, -50%) scale(1.3);
   }
   70% {
     opacity: 1;
@@ -130,41 +469,70 @@ body {
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -85%) scale(0.95);
+    transform: translate(-50%, -85%) scale(1);
   }
 }
 
 .anim-idle {
-  animation: idle-shake 0.5s steps(2, end) infinite;
+  /* Whole-pixel jitter on a 2-frame cycle. */
+  animation: idle-shake 0.4s steps(1, end) infinite;
 }
 
 .anim-sweep {
-  animation: sweep 7s linear infinite;
+  animation: sweep 7s steps(30, end) infinite;
 }
 
 .anim-kaching {
-  animation: kaching-flash 0.9s ease-out both;
+  animation: kaching-flash 0.9s steps(6, end) both;
 }
 
 .anim-kaching-pop {
-  animation: kaching-pop 1.5s ease-out both;
+  animation: kaching-pop 1.5s steps(10, end) both;
 }
 
 /* A meter that just moved gives itself away for a moment. */
 @keyframes meter-flash {
-  0% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-  25% {
-    box-shadow: 0 0 10px 1px currentColor;
+  0%,
+  40% {
+    filter: brightness(2.2);
   }
   100% {
-    box-shadow: 0 0 0 0 transparent;
+    filter: brightness(1);
   }
 }
 
 .anim-meter-flash {
-  animation: meter-flash 1.1s ease-out both;
+  animation: meter-flash 0.8s steps(4, end) both;
+}
+
+/* The dialogue box's "there is more" arrow. */
+@keyframes nudge {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+.anim-nudge {
+  animation: nudge 0.7s steps(2, end) infinite;
+}
+
+/* Attract-mode title bob. */
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.anim-bob {
+  animation: bob 2.4s steps(4, end) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -172,11 +540,15 @@ body {
   .anim-fade,
   .anim-fade-late,
   .anim-blink,
+  .anim-blink-soft,
   .anim-idle,
   .anim-sweep,
   .anim-kaching,
   .anim-kaching-pop,
-  .anim-meter-flash {
+  .anim-meter-flash,
+  .anim-nudge,
+  .anim-bob,
+  .anim-crt-roll {
     animation: none;
   }
 }

@@ -1,93 +1,191 @@
+import type { ReactNode } from "react";
+
 import { AnswerInput } from "./components/AnswerInput";
 import { HistoryLog } from "./components/HistoryLog";
 import { QuestionPanel } from "./components/QuestionPanel";
 import { RadarPanel } from "./components/RadarPanel";
 import { TaxiView } from "./components/TaxiView";
-import { ThinkingBubble } from "./components/ThinkingBubble";
+import { ThinkingPanel } from "./components/ThinkingPanel";
+import { TitleScreen } from "./components/TitleScreen";
 import { useGame } from "./hooks/useGame";
+import { useTypewriter } from "./hooks/useTypewriter";
 
 export default function App() {
   const { state, phase, error, waiting, canAnswer, start, answer } = useGame();
 
-  // No state yet means the ride never started - including when start failed,
-  // so the player can try again instead of staring at a locked screen.
-  if (!state) {
-    return (
-      <TitleScreen
-        onStart={start}
-        starting={phase === "starting"}
-        error={error}
-      />
-    );
-  }
+  /*
+   * Abu Fadi thinks out loud before he speaks. The thought types itself out
+   * first and the question only lands once it finishes, so a turn reads
+   * thought-then-answer instead of arriving all at once.
+   */
+  const thinking = useTypewriter(
+    state?.thinking ?? "",
+    state?.message_count ?? 0,
+  );
+  /** A new thought is still landing, so he has not got to the question yet. */
+  const streaming = !waiting && !thinking.done;
 
   return (
-    <div className="flex h-dvh flex-col bg-zinc-950 text-zinc-100 lg:flex-row">
-      {/* Left: the back seat, with Abu Fadi's dashboard bolted underneath. */}
-      <section className="flex min-h-0 flex-1 flex-col overflow-y-auto border-b border-zinc-800 bg-black lg:border-r lg:border-b-0">
-        <TaxiView
-          mood={state.mood}
-          action={state.driver_action}
-          turn={state.message_count}
+    <Cabinet>
+      {/*
+       * No state yet means the ride never started - including when start
+       * failed, so the player can try again instead of staring at a locked
+       * screen.
+       */}
+      {!state ? (
+        <TitleScreen
+          onStart={start}
+          starting={phase === "starting"}
+          error={error}
         />
-        <div className="mt-auto border-t border-zinc-800/80 bg-gradient-to-b from-zinc-950 to-black p-4 sm:p-5">
-          <RadarPanel radar={state.radar} messageCount={state.message_count} />
-        </div>
-      </section>
-
-      {/* Right: the conversation. */}
-      <section className="flex min-h-0 w-full flex-col gap-4 p-5 sm:p-8 lg:max-w-xl">
-        <Header count={state.message_count} max={state.max_messages} />
-
-        <HistoryLog history={state.history} />
-
-        <div className="space-y-4">
-          <ThinkingBubble
-            thinking={state.thinking}
-            mood={state.mood}
-            waiting={waiting}
-          />
-          <QuestionPanel
-            question={state.question}
-            turn={state.message_count}
-            dimmed={waiting}
+      ) : (
+        <div className="flex h-full min-h-0 flex-col">
+          <Hud
+            count={state.message_count}
+            max={state.max_messages}
+            ended={state.game_status === "ended"}
           />
 
-          {error && (
-            <p className="rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">
-              {error}
-            </p>
-          )}
+          <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+            {/* Left: the back seat, with Abu Fadi's dashboard bolted under. */}
+            <section className="pix-scroll flex min-h-0 shrink-0 flex-col gap-2 overflow-y-auto p-2 sm:gap-3 sm:p-3 lg:w-[46%] lg:shrink lg:flex-1">
+              <div className="bevel p-1">
+                <TaxiView
+                  mood={state.mood}
+                  action={state.driver_action}
+                  turn={state.message_count}
+                />
+              </div>
+              {/* Bolted to the bottom of the dash, so the column has no
+                  dead space under it on a wide screen. */}
+              <div className="lg:mt-auto">
+                <RadarPanel
+                  radar={state.radar}
+                  messageCount={state.message_count}
+                />
+              </div>
+            </section>
 
-          {state.game_status === "ended" ? (
-            <RideOver />
-          ) : (
-            <AnswerInput
-              disabled={!canAnswer}
-              waiting={waiting}
-              onSubmit={answer}
-            />
-          )}
+            {/* Right: the conversation. */}
+            <section className="flex min-h-0 w-full flex-col gap-2 border-t-4 border-cab-hi p-2 sm:gap-3 sm:p-3 lg:max-w-2xl lg:border-t-0 lg:border-l-4">
+              <HistoryLog history={state.history} />
 
-          {state.ai_degraded && (
-            <p className="text-xs text-zinc-600">
-              The radio cut out for a second - Abu Fadi kept talking anyway.
-            </p>
-          )}
+              <div className="space-y-2 sm:space-y-3">
+                <ThinkingPanel
+                  shown={thinking.shown}
+                  done={thinking.done}
+                  mood={state.mood}
+                  waiting={waiting}
+                />
+
+                <QuestionPanel
+                  question={state.question}
+                  turn={state.message_count}
+                  ready={!streaming}
+                  dimmed={waiting}
+                />
+
+                {error && (
+                  <p className="bevel-in px-3 py-2 font-term text-lg text-blood">
+                    ! {error}
+                  </p>
+                )}
+
+                {state.game_status === "ended" ? (
+                  <RideOver />
+                ) : (
+                  <AnswerInput
+                    // Stays locked until the question is actually on screen,
+                    // so nobody answers a question they cannot read yet.
+                    disabled={!canAnswer || streaming}
+                    waiting={waiting}
+                    onSubmit={answer}
+                  />
+                )}
+
+                {state.ai_degraded && (
+                  <p className="font-pixel text-[7px] leading-relaxed text-khaki">
+                    ⚠ RADIO STATIC — ABU FADI KEPT TALKING ANYWAY
+                  </p>
+                )}
+              </div>
+            </section>
+          </div>
         </div>
-      </section>
+      )}
+    </Cabinet>
+  );
+}
+
+/**
+ * The machine the game is running on.
+ *
+ * Margins on all four sides, a bezel, then the glass - so the page reads as a
+ * screen sitting in a room rather than a website filling a window. The CRT
+ * layers on top are decorative and never take pointer events.
+ */
+function Cabinet({ children }: { children: ReactNode }) {
+  return (
+    <div className="h-dvh bg-black p-2 sm:p-4 lg:p-7">
+      {/* Bezel. */}
+      <div className="bevel h-full border-[6px] p-1 shadow-[0_0_0_2px_#000] sm:p-1.5">
+        {/* Glass. */}
+        <div className="bevel-in relative h-full overflow-hidden">
+          <div className="pix-scroll relative h-full overflow-y-auto">
+            {children}
+          </div>
+
+          {/* --- CRT overlays, all decorative --- */}
+          <div
+            aria-hidden="true"
+            className="crt-lines pointer-events-none absolute inset-0 z-20 opacity-60"
+          />
+          <div
+            aria-hidden="true"
+            className="crt-vignette pointer-events-none absolute inset-0 z-20"
+          />
+          <div
+            aria-hidden="true"
+            className="anim-crt-roll pointer-events-none absolute inset-x-0 top-0 z-20 h-16 bg-bone/5"
+          />
+        </div>
+      </div>
     </div>
   );
 }
 
-function Header({ count, max }: { count: number; max: number }) {
+/** Status bar along the top of the glass. Fare counter, not a score. */
+function Hud({
+  count,
+  max,
+  ended,
+}: {
+  count: number;
+  max: number;
+  ended: boolean;
+}) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+
   return (
-    <div className="flex items-baseline justify-between">
-      <h1 className="text-xs tracking-[0.25em] text-amber-600/80 uppercase">
-        Abu Fadi
-      </h1>
-      <span className="font-mono text-xs text-zinc-700">
-        {count}/{max}
+    <div className="flex shrink-0 items-center justify-between gap-2 border-b-4 border-cab-hi bg-night px-2 py-2 font-pixel text-[7px] sm:px-3 sm:text-[10px]">
+      <span className="flex items-center gap-1.5 text-taxi sm:gap-2.5">
+        <span className="bevel-gold px-1.5 py-1">TAXI</span>
+        <span className="hidden text-bone sm:inline">ABU FADI</span>
+      </span>
+
+      <span className="flex items-center gap-2 sm:gap-4">
+        {/* A row of pips is readable at a glance in a way "7/12" is not. */}
+        <span aria-hidden="true" className="hidden gap-[3px] sm:flex">
+          {Array.from({ length: max }, (_, i) => (
+            <span
+              key={i}
+              className={`h-2.5 w-1.5 ${i < count ? "bg-taxi" : "bg-cab-hi"}`}
+            />
+          ))}
+        </span>
+        <span className={ended ? "text-blood" : "text-dust"}>
+          {ended ? "RIDE OVER" : `TURN ${pad(count)}/${pad(max)}`}
+        </span>
       </span>
     </div>
   );
@@ -96,47 +194,11 @@ function Header({ count, max }: { count: number; max: number }) {
 function RideOver() {
   // Phase 8 turns this into the reveal.
   return (
-    <div className="rounded-lg border border-amber-900/50 bg-amber-950/20 px-4 py-3 text-sm text-amber-200/80">
-      Wselna. The ride is over.
-    </div>
-  );
-}
-
-function TitleScreen({
-  onStart,
-  starting,
-  error,
-}: {
-  onStart: () => void;
-  starting: boolean;
-  error: string | null;
-}) {
-  return (
-    <div className="flex h-dvh flex-col items-center justify-center gap-8 bg-zinc-950 px-6 text-center">
-      <div className="anim-rise space-y-3">
-        <p className="text-xs tracking-[0.4em] text-zinc-600 uppercase">
-          Beirut, sometime after 6pm
-        </p>
-        <h1 className="text-4xl font-bold tracking-tight text-amber-400 sm:text-5xl">
-          THE LEBANESE
-          <br />
-          TAXI EXPERIENCE
-        </h1>
-        <p className="text-sm text-zinc-500">A taxi stops. You get in.</p>
-      </div>
-
-      <button
-        className="anim-fade-late rounded-lg bg-amber-500 px-8 py-3 font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:opacity-60"
-        type="button"
-        onClick={onStart}
-        disabled={starting}
-      >
-        {starting ? "Getting in..." : error ? "Try again" : "Get in"}
-      </button>
-
-      {error && (
-        <p className="max-w-sm text-sm text-red-400/80">{error}</p>
-      )}
+    <div className="bevel-gold anim-rise px-3 py-3 text-center">
+      <p className="font-pixel text-[10px] sm:text-sm">WSELNA.</p>
+      <p className="mt-2 font-term text-lg leading-tight">
+        The door is open. The ride is over.
+      </p>
     </div>
   );
 }
