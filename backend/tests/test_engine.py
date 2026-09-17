@@ -48,16 +48,12 @@ def test_out_of_range_changes_are_clamped_to_ten():
     assert s.religion_confidence_change == -10
 
 
-def test_invalid_enums_fall_back_to_defaults():
-    s = suggestion(mood="ecstatic", driver_action="backflip")
-    assert s.mood == "neutral"
-    assert s.driver_action == "normal"
+def test_invalid_mood_falls_back_to_default():
+    assert suggestion(mood="ecstatic").mood == "neutral"
 
 
-def test_enums_are_case_insensitive():
-    s = suggestion(mood="Suspicious", driver_action="MONEY")
-    assert s.mood == "suspicious"
-    assert s.driver_action == "money"
+def test_mood_is_case_insensitive():
+    assert suggestion(mood="Suspicious").mood == "suspicious"
 
 
 def test_junk_types_are_coerced_not_fatal():
@@ -99,7 +95,6 @@ def test_apply_updates_radar_counter_and_presentation():
             question="Shu bta3mel bel shighel?",
             thinking="Saida... hmmm.",
             mood="curious",
-            driver_action="mirror",
             radar_changes={"money": 5, "status": 3, "suspicion": 2, "tip": 1},
             money_confidence_change=10,
         ),
@@ -182,3 +177,32 @@ def test_ai_may_end_the_ride_after_the_soft_threshold():
     engine.apply_suggestion(state, suggestion(end_conversation=True))
     assert state.game_status == "ended"
     assert state.end_reason == engine.END_BY_AI
+
+
+# --- early reveal ----------------------------------------------------------- #
+
+
+def test_high_background_confidence_alone_ends_the_ride_early():
+    """He has the punchline - he does not need the money thread to finish."""
+    state = engine.new_game()
+    state.religion_confidence = 85
+    engine.apply_suggestion(state, suggestion(religion_confidence_change=5))
+    assert state.message_count == 1  # very early in the ride
+    assert state.game_status == "ended"
+    assert state.end_reason == engine.END_BY_EARLY_REVEAL
+
+
+def test_high_money_confidence_alone_does_not_end_early():
+    """Money is not the punchline, so it never short-circuits the ride."""
+    state = engine.new_game()
+    state.money_confidence = 100
+    engine.apply_suggestion(state, suggestion())
+    assert state.game_status == "active"
+
+
+def test_early_reveal_beats_the_both_threshold_rule():
+    state = engine.new_game()
+    state.money_confidence = 95
+    state.religion_confidence = 95
+    engine.apply_suggestion(state, suggestion())
+    assert state.end_reason == engine.END_BY_EARLY_REVEAL

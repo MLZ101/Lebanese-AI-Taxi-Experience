@@ -7,7 +7,7 @@ A short AI comedy game. You are in the back of Abu Fadi's taxi. He is nosy.
 - **Frontend** React + TypeScript + Vite + Tailwind + Framer Motion, styled as
   a 1997 arcade cabinet (Press Start 2P + VT323, self-hosted via Fontsource)
 - **Backend** Python + FastAPI + Pydantic
-- **AI** Gemini 3 Flash-Lite, behind a small provider abstraction
+- **AI** `gemini-3.5-flash-lite`, behind a small provider abstraction
 - **State** in-memory sessions, no database
 
 ## Architecture
@@ -64,6 +64,60 @@ and are worth keeping:
 - **The page has margins.** `Cabinet` in `App.tsx` wraps everything in bezel →
   glass, with scanline, vignette and rolling-line overlays on top. All three are
   `pointer-events-none` and `aria-hidden`.
+## Model choice
+
+Picked in the UI before the ride starts; a session keeps its model for the whole
+conversation. `GET /ai/models` returns the catalog, each row flagged available
+or not. An unknown id falls back to a usable one instead of failing.
+
+Measured over a fixed 4-turn ride:
+
+| model | p50 | notes |
+|---|---|---|
+| `gemini-3.5-flash-lite` | **2.18s** | default |
+| `gemini-3.1-flash-lite` | 3.32s | |
+| `gemini-3-flash-preview` | - | bigger model |
+| `fallback` | instant | scripted, no AI |
+
+Adding a model is one row in `backend/app/ai/catalog.py`. Any provider failure
+falls through to the scripted driver rather than stalling the ride.
+
+## Abu Fadi's two threads
+
+He is working out two things and he alternates between them: how much money the
+passenger has, and which ta2ifa they are. The second one he gets at **bel
+ta7ayol** - never by asking. He asks the innocent questions a nosy driver asks
+anybody (the village, the family name, the school, where they go at the 3id) and
+treats every answer as enormous evidence.
+
+He is forbidden from asking outright or saying anything while they are still in
+the car. He names his guess **once**, at the reveal, as the passenger is getting
+out - and it stays a guess: the player answers `sa7` or `ghalat` and he has a
+line ready either way. He does not take being wrong well.
+
+His reasoning is deliberately rubbish, and he is warm about everyone. That gap -
+nonsense evidence, total certainty - is the joke.
+
+## Endings
+
+The engine decides, never the LLM. In `backend/app/engine.py`:
+
+| rule | constant | fires |
+|---|---|---|
+| early reveal - background theory alone | `EARLY_REVEAL_CONFIDENCE = 90` | any turn |
+| both theories confident | `CONFIDENCE_END_THRESHOLD = 70` | any turn |
+| Abu Fadi asks to stop | `SOFT_END_MESSAGES = 7` | turn 7+ |
+| hard ceiling | `MAX_MESSAGES = 10` | turn 10 |
+
+In practice rides end on the third rule around turn 7-8. The confidence-based
+rules are tuned higher than the model's self-reported numbers actually reach -
+see the measurement note beside `EARLY_REVEAL_CONFIDENCE`.
+
+Once a ride ends the engine asks for a **verdict** - a second, differently
+shaped LLM call producing his named guess, both reactions, his conclusions, the
+ridiculous evidence, the fare and a closing line. If that call fails, a scripted
+verdict stands in, and a blank `guess` is backfilled: losing the payoff is the
+one failure a player would really notice.
 
 ## The radar
 
@@ -81,7 +135,7 @@ carries an etched pictogram plus one engraved word, MONEY / STATUS / DOUBT /
 TIP, coloured to match its own needle arc. Real clusters label FUEL and TEMP;
 this one does the same.
 
-The pictograms are pixel grids in `frontend/src/components/DashIcons.tsx`, not
+The pictograms are pixel grids in `frontend/src/components/dashIcons.ts`, not
 an icon font - emoji and icon fonts would be the only smooth thing on screen.
 Each grid is exactly 9x9 and must be drawn at a whole multiple of 9 px (27, 36),
 or the cell edges land on half pixels and the icon turns to mush.
@@ -114,10 +168,11 @@ opens immediately.
 
 ## Driver reactions
 
-There is a single piece of art, so Abu Fadi's four `driver_action` states are
-camera moves over it (lean to the mirror, a nod, a greedy flare) rather than
-separate frames. If real frames turn up, only `ACTION_MOTION` in
-`TaxiView.tsx` needs to change.
+Mood is the only reaction signal - it drives both the colour of the cabin and
+what Abu Fadi's body does. There is a single piece of art, so the five moods are
+camera moves over it (a glance at the mirror, turning to study you, a greedy
+flare) rather than separate frames. If real frames turn up, only `MOOD_MOTION`
+in `TaxiView.tsx` needs to change.
 
 Framer Motion drives those reactions; everything the player must *read* is
 animated in CSS instead, with the base style already the finished state. A
@@ -151,8 +206,8 @@ backend/app/sessions.py  in-memory session store
 backend/app/schemas.py   API request/response shapes
 backend/app/main.py      FastAPI app
 backend/app/prompts.py   Abu Fadi persona + per-turn pacing briefing
-backend/app/ai/          provider abstraction: base, gemini, fallback
-backend/tests/           52 tests
+backend/app/ai/          base, gemini, fallback, catalog (the model list)
+backend/tests/           77 tests
 
 frontend/src/types.ts      mirrors PublicState - keep in sync
 frontend/src/api/client.ts typed fetch + ApiError
@@ -164,5 +219,7 @@ frontend/src/components/   TitleScreen (the attract screen)
                            ThinkingPanel (the thought, typing itself out)
                            QuestionPanel (the dialogue box), AnswerInput,
                            HistoryLog
+                           RevealScreen (the Tawa2ef payoff)
+                           ModelPicker (which brain drives)
 frontend/src/assets/       abu-fadi.jpeg - the one piece of art
 ```

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 from . import engine
-from .ai import canned_suggestion, get_provider
+from .ai import canned_suggestion, canned_verdict, get_provider, resolve
 from .models import GameState
 from .sessions import SessionStore
 
@@ -36,9 +36,9 @@ class InvalidAnswer(GameError):
     pass
 
 
-def start_game(store: SessionStore) -> GameState:
-    """Open a ride with Abu Fadi's opening question already waiting."""
-    return store.add(engine.new_game())
+def start_game(store: SessionStore, model_id: str | None = None) -> GameState:
+    """Open a ride. An unknown or keyless model quietly falls back to a usable one."""
+    return store.add(engine.new_game(model_id=resolve(model_id)))
 
 
 def _clean_answer(answer: str) -> str:
@@ -62,11 +62,40 @@ async def submit_answer(
 
     degraded = False
     try:
-        suggestion = await get_provider().suggest(state)
+        suggestion = await get_provider(state.model_id).suggest(state)
     except Exception as exc:  # noqa: BLE001 - nothing may stop the ride
         log.warning("AI turn failed for %s, using fallback: %s", session_id, exc)
         suggestion = canned_suggestion(state)
         degraded = True
 
     engine.apply_suggestion(state, suggestion)
+
+    if state.game_status == "ended":
+        degraded = await _attach_verdict(state) or degraded
     return state, degraded
+
+
+async def _attach_verdict(state: GameState) -> bool:
+    """Ask Abu Fadi for his conclusion. Returns True if we had to fake it.
+
+    A failed verdict must never cost the player the ending - that is the whole
+    payoff - so this falls back the same way a turn does.
+    """
+    try:
+        verdict = await get_provider(state.model_id).verdict(state)
+    except Exception as exc:  # noqa: BLE001 - the reveal always happens
+        log.warning("verdict failed for %s, using fallback: %s", state.session_id, exc)
+        state.verdict = canned_verdict(state)
+        return True
+
+    # The guess is the entire payoff. The model occasionally returns it blank,
+    # which would leave the player staring at an empty headline, so patch in
+    # the scripted line rather than ship a hole where the joke goes.
+    spare = canned_verdict(state)
+    if not verdict.guess:
+        log.warning("empty guess for %s, using the scripted one", state.session_id)
+        verdict.guess = spare.guess
+        verdict.if_right = verdict.if_right or spare.if_right
+        verdict.if_wrong = verdict.if_wrong or spare.if_wrong
+    state.verdict = verdict
+    return False

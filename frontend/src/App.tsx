@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 
+import type { Verdict } from "./types";
+
 import { AnswerInput } from "./components/AnswerInput";
 import { HistoryLog } from "./components/HistoryLog";
 import { QuestionPanel } from "./components/QuestionPanel";
 import { RadarPanel } from "./components/RadarPanel";
+import { RevealScreen } from "./components/RevealScreen";
 import { TaxiView } from "./components/TaxiView";
 import { ThinkingPanel } from "./components/ThinkingPanel";
 import { TitleScreen } from "./components/TitleScreen";
@@ -11,7 +14,19 @@ import { useGame } from "./hooks/useGame";
 import { useTypewriter } from "./hooks/useTypewriter";
 
 export default function App() {
-  const { state, phase, error, waiting, canAnswer, start, answer } = useGame();
+  const {
+    state,
+    phase,
+    error,
+    waiting,
+    canAnswer,
+    start,
+    answer,
+    reset,
+    models,
+    model,
+    setModel,
+  } = useGame();
 
   /*
    * Abu Fadi thinks out loud before he speaks. The thought types itself out
@@ -37,6 +52,9 @@ export default function App() {
           onStart={start}
           starting={phase === "starting"}
           error={error}
+          models={models}
+          model={model}
+          onModel={setModel}
         />
       ) : (
         <div className="flex h-full min-h-0 flex-col">
@@ -50,11 +68,7 @@ export default function App() {
             {/* Left: the back seat, with Abu Fadi's dashboard bolted under. */}
             <section className="pix-scroll flex min-h-0 shrink-0 flex-col gap-2 overflow-y-auto p-2 sm:gap-3 sm:p-3 lg:w-[46%] lg:shrink lg:flex-1">
               <div className="bevel p-1">
-                <TaxiView
-                  mood={state.mood}
-                  action={state.driver_action}
-                  turn={state.message_count}
-                />
+                <TaxiView mood={state.mood} turn={state.message_count} />
               </div>
               {/* Bolted to the bottom of the dash, so the column has no
                   dead space under it on a wide screen. */}
@@ -92,7 +106,11 @@ export default function App() {
                 )}
 
                 {state.game_status === "ended" ? (
-                  <RideOver />
+                  <RideOver
+                    verdict={state.verdict}
+                    turns={state.message_count}
+                    onRideAgain={reset}
+                  />
                 ) : (
                   <AnswerInput
                     // Stays locked until the question is actually on screen,
@@ -191,14 +209,27 @@ function Hud({
   );
 }
 
-function RideOver() {
-  // Phase 8 turns this into the reveal.
+/** The door opens. Abu Fadi has something to say before you go. */
+function RideOver({
+  verdict,
+  turns,
+  onRideAgain,
+}: {
+  verdict: Verdict | null;
+  turns: number;
+  onRideAgain: () => void;
+}) {
+  if (!verdict) {
+    return (
+      <div className="bevel-gold anim-rise px-3 py-3 text-center">
+        <p className="font-pixel text-[10px] sm:text-sm">WSELNA.</p>
+        <p className="mt-2 font-term text-lg leading-tight">
+          The door is open. The ride is over.
+        </p>
+      </div>
+    );
+  }
   return (
-    <div className="bevel-gold anim-rise px-3 py-3 text-center">
-      <p className="font-pixel text-[10px] sm:text-sm">WSELNA.</p>
-      <p className="mt-2 font-term text-lg leading-tight">
-        The door is open. The ride is over.
-      </p>
-    </div>
+    <RevealScreen verdict={verdict} turns={turns} onRideAgain={onRideAgain} />
   );
 }

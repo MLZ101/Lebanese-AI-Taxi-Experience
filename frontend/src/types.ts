@@ -1,7 +1,6 @@
 /** Mirrors backend/app/schemas.py::PublicState. Keep the two in sync. */
 
 export type Mood = "neutral" | "curious" | "suspicious" | "excited" | "upset";
-export type DriverAction = "normal" | "mirror" | "nod" | "money";
 export type GameStatus = "active" | "ended";
 export type Speaker = "abu_fadi" | "passenger";
 
@@ -25,8 +24,31 @@ export interface DebugInfo {
   soft_end_messages: number;
 }
 
+export interface ModelOption {
+  id: string;
+  label: string;
+  provider: string;
+  note: string;
+  available: boolean;
+}
+
+/** Abu Fadi's conclusion. Only present once the ride has ended. */
+export interface Verdict {
+  /** The call itself - the ta2ifa he landed on. The payoff. */
+  guess: string;
+  if_right: string;
+  if_wrong: string;
+  money_verdict: string;
+  background_verdict: string;
+  evidence: string[];
+  fare: string;
+  closing_line: string;
+}
+
 export interface GameState {
   session_id: string;
+  /** The model actually driving this ride, after the backend resolved it. */
+  model: string;
   message_count: number;
   max_messages: number;
   game_status: GameStatus;
@@ -35,10 +57,11 @@ export interface GameState {
   question: string;
   thinking: string;
   mood: Mood;
-  driver_action: DriverAction;
   history: Turn[];
   /** The AI call failed and the scripted driver stood in. */
   ai_degraded: boolean;
   /** Null in a demo build - see EXPOSE_DEBUG in the backend .env. */
   debug: DebugInfo | null;
+  /** Null while the ride is running. */
+  verdict: Verdict | null;
 }

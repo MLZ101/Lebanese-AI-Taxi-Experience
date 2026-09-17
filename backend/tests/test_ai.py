@@ -5,13 +5,19 @@ import asyncio
 import pytest
 
 from app import engine
-from app.ai.base import AIError, parse_suggestion, system_text, transcript
+from app.ai.base import (
+    AIError,
+    parse_suggestion,
+    parse_verdict,
+    system_text,
+    transcript,
+    verdict_text,
+)
 from app.ai.fallback import FallbackProvider, canned_suggestion
 from app.ai.gemini import GeminiProvider
 
 GOOD = """
 {"question": "Min wein ya zalameh?", "thinking": "Hmmm.", "mood": "curious",
- "driver_action": "mirror",
  "radar_changes": {"money": 3, "status": 1, "suspicion": 0, "tip": 2},
  "money_confidence_change": 5, "religion_confidence_change": 4,
  "end_conversation": false}
@@ -31,7 +37,7 @@ def test_parses_through_markdown_fence():
 
 def test_parses_json_buried_in_prose():
     wrapped = f"Sure! Here is the turn:\n{GOOD}\nHope that helps."
-    assert parse_suggestion(wrapped).driver_action == "mirror"
+    assert parse_suggestion(wrapped).mood == "curious"
 
 
 @pytest.mark.parametrize(
@@ -102,9 +108,14 @@ def test_gemini_joins_multipart_text():
 
 
 def test_gemini_payload_carries_schema_and_history():
+    from app.ai.base import system_text
+    from app.ai.gemini import RESPONSE_SCHEMA
+
     state = engine.new_game()
     engine.record_answer(state, "Hamra please")
-    payload = GeminiProvider(api_key="test-key")._payload(state)
+    payload = GeminiProvider(api_key="test-key")._payload(
+        state, system_text(state), RESPONSE_SCHEMA
+    )
     assert payload["generationConfig"]["responseMimeType"] == "application/json"
     assert "question" in payload["generationConfig"]["responseSchema"]["required"]
     assert [c["role"] for c in payload["contents"]] == ["model", "user"]
@@ -138,3 +149,87 @@ def test_fallback_survives_running_out_of_script():
         assert suggestion.question
         engine.apply_suggestion(state, suggestion)
         state.game_status = "active"
+
+
+def test_rate_limits_get_a_longer_backoff_than_ordinary_errors():
+    """A 429 needs real patience; a blip just needs a beat."""
+    import httpx
+
+    provider = GeminiProvider(api_key="k")
+    assert provider._retry_delay(httpx.Response(429), 0) > provider._retry_delay(
+        httpx.Response(500), 0
+    )
+    assert (
+        provider._retry_delay(httpx.Response(429, headers={"retry-after": "3"}), 0)
+        == 3.0
+    )
+
+
+# --- the reveal ------------------------------------------------------------- #
+
+GOOD_VERDICT = """
+{"money_verdict": "Ma3ak masari bas mkhabbi.",
+ "background_verdict": "Min 3ayle mnee7a, ahlak min day3a.",
+ "evidence": ["El sayyara 7akit", "Ma sa2alt 3an el ta3rifeh"],
+ "fare": "Khalas, 3atine li badak.",
+ "closing_line": "Rou7 bi salemeh ya zalameh."}
+"""
+
+
+def test_verdict_parses_and_keeps_the_evidence():
+    verdict = parse_verdict(GOOD_VERDICT)
+    assert verdict.money_verdict.startswith("Ma3ak")
+    assert len(verdict.evidence) == 2
+
+
+def test_verdict_survives_junk_and_caps_the_evidence():
+    verdict = parse_verdict(
+        '{"money_verdict": "x", "background_verdict": "y",'
+        ' "evidence": ["a","b","c","d","e"], "fare": null, "closing_line": 7}'
+    )
+    assert len(verdict.evidence) == 4
+    assert verdict.fare == ""
+    assert verdict.closing_line == "7"
+
+
+@pytest.mark.parametrize("raw", ["", "not json", '{"money_verdict": ""}'])
+def test_unusable_verdicts_raise(raw):
+    with pytest.raises(AIError):
+        parse_verdict(raw)
+
+
+def test_he_may_not_ask_outright_during_the_ride():
+    """The whole game is working it out sideways - asking would end it."""
+    text = system_text(engine.new_game())
+    assert "NEVER ask what someone is" in text
+    assert "ta7ayol" in text
+    # And the indirect questions he works from are actually listed for him.
+    for clue in ("day3a", "esm el 3ayleh", "madrase", "sayf"):
+        assert clue in text.lower()
+
+
+def test_he_names_his_guess_only_at_the_reveal():
+    text = verdict_text(engine.new_game())
+    assert "NOW YOU SAY IT" in text
+    assert '"guess"' in text
+    assert "NAMED" in text
+
+
+def test_the_scripted_driver_always_has_a_verdict():
+    verdict = asyncio.run(FallbackProvider().verdict(engine.new_game()))
+    assert verdict.money_verdict and verdict.background_verdict
+
+
+def test_payload_never_ends_on_a_model_turn():
+    """Gemini 400s on that, and at verdict time the transcript always does."""
+    from app.ai.gemini import RESPONSE_SCHEMA
+
+    provider = GeminiProvider(api_key="k")
+    state = engine.new_game()  # opening question only -> ends on a model turn
+    contents = provider._payload(state, "sys", RESPONSE_SCHEMA)["contents"]
+    assert contents[-1]["role"] == "user"
+
+    engine.record_answer(state, "Hamra")  # now ends on the passenger
+    contents = provider._payload(state, "sys", RESPONSE_SCHEMA)["contents"]
+    assert contents[-1]["role"] == "user"
+    assert contents[-1]["parts"][0]["text"] == "Hamra"

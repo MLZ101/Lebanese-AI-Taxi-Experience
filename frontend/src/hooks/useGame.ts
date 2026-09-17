@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ApiError, sendAnswer, startGame } from "../api/client";
-import type { GameState } from "../types";
+import { ApiError, fetchModels, sendAnswer, startGame } from "../api/client";
+import type { GameState, ModelOption } from "../types";
 
 /**
  * The whole client-side game state. One hook, no state library - the game is
@@ -11,11 +11,19 @@ export type Phase = "idle" | "starting" | "ready" | "thinking" | "ended" | "erro
 
 export function useGame() {
   const [state, setState] = useState<GameState | null>(null);
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [model, setModel] = useState<string | undefined>(undefined);
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
 
   /** Guards against double submits racing each other past the disabled input. */
   const busy = useRef(false);
+
+  // Load the catalog once. If it fails the picker just stays empty and the
+  // backend chooses - never a reason to block the game.
+  useEffect(() => {
+    fetchModels().then(setModels);
+  }, []);
 
   const run = useCallback(
     async (work: () => Promise<GameState>, pending: Phase) => {
@@ -37,7 +45,10 @@ export function useGame() {
     [],
   );
 
-  const start = useCallback(() => run(startGame, "starting"), [run]);
+  const start = useCallback(
+    () => run(() => startGame(model), "starting"),
+    [run, model],
+  );
 
   const answer = useCallback(
     (text: string) => {
@@ -48,10 +59,30 @@ export function useGame() {
     [run, state],
   );
 
+  /** Back to the title screen, so the model can be changed before a new ride. */
+  const reset = useCallback(() => {
+    if (busy.current) return;
+    setState(null);
+    setPhase("idle");
+    setError(null);
+  }, []);
+
   /** True while Abu Fadi is working - the input stays locked. */
   const waiting = phase === "starting" || phase === "thinking";
 
   const canAnswer = Boolean(state) && phase === "ready";
 
-  return { state, phase, error, waiting, canAnswer, start, answer };
+  return {
+    state,
+    phase,
+    error,
+    waiting,
+    canAnswer,
+    start,
+    answer,
+    reset,
+    models,
+    model,
+    setModel,
+  };
 }

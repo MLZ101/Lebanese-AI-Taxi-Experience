@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import config, service
+from .ai import listing
 from .schemas import AnswerRequest, PublicState, StartRequest
 from .sessions import store
 
@@ -31,10 +32,17 @@ def health() -> dict:
     }
 
 
+@app.get("/ai/models")
+def models() -> dict:
+    """Which brains can drive, and which have a key configured."""
+    return {"models": listing()}
+
+
 @app.post("/game/start", response_model=PublicState)
-def start_game(_: StartRequest | None = None) -> PublicState:
+def start_game(request: StartRequest | None = None) -> PublicState:
     """Open a ride and hand back Abu Fadi's first question."""
-    return PublicState.from_state(service.start_game(store))
+    chosen = request.model if request else None
+    return PublicState.from_state(service.start_game(store, chosen))
 
 
 @app.post("/game/answer", response_model=PublicState)

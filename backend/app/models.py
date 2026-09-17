@@ -16,15 +16,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # --- Fixed vocabularies (these map 1:1 to UI assets, so no free-form values) ---
 
 Mood = Literal["neutral", "curious", "suspicious", "excited", "upset"]
-DriverAction = Literal["normal", "mirror", "nod", "money"]
 GameStatus = Literal["active", "ended"]
 Speaker = Literal["abu_fadi", "passenger"]
 
 MOODS: tuple[str, ...] = ("neutral", "curious", "suspicious", "excited", "upset")
-DRIVER_ACTIONS: tuple[str, ...] = ("normal", "mirror", "nod", "money")
 
 DEFAULT_MOOD: Mood = "neutral"
-DEFAULT_DRIVER_ACTION: DriverAction = "normal"
 
 # Per-turn suggestion limits. Totals are clamped separately by the engine.
 CHANGE_MIN = -10
@@ -78,13 +75,72 @@ class Presentation(BaseModel):
     question: str
     thinking: str = ""
     mood: Mood = DEFAULT_MOOD
-    driver_action: DriverAction = DEFAULT_DRIVER_ACTION
+
+
+class Verdict(BaseModel):
+    """Abu Fadi's final theory, delivered once the ride is over.
+
+    Untrusted and coerced like everything else he says. This is the one place
+    he states his guess outright - during the ride he only ever works at it
+    sideways.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    money_verdict: str
+    background_verdict: str
+    #: The call itself - the thing he has been working out all ride. He names it
+    #: here and nowhere else, and it is a guess the player gets to judge.
+    guess: str = ""
+    #: What he says when you tell him he got it right.
+    if_right: str = ""
+    #: What he says when you tell him he got it wrong. He does not believe you.
+    if_wrong: str = ""
+    #: The ridiculous "proof" he cites. Two to four lines.
+    evidence: list[str] = Field(default_factory=list)
+    #: What he decides to charge, adjusted to his theory.
+    fare: str = ""
+    #: The last thing he says as you get out.
+    closing_line: str = ""
+
+    @field_validator(
+        "money_verdict",
+        "background_verdict",
+        "guess",
+        "if_right",
+        "if_wrong",
+        "fare",
+        "closing_line",
+        mode="before",
+    )
+    @classmethod
+    def _clean(cls, value: Any) -> str:
+        return "" if value is None else str(value).strip()
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def _clean_evidence(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            return []
+        items = [str(v).strip() for v in value if v is not None and str(v).strip()]
+        return items[:4]
+
+    @field_validator("money_verdict", "background_verdict")
+    @classmethod
+    def _required(cls, value: str) -> str:
+        if not value:
+            raise ValueError("verdict must not be empty")
+        return value
 
 
 class GameState(BaseModel):
     """The whole truth about one taxi ride. Only the engine mutates this."""
 
     session_id: str
+    #: Which model is driving this ride. Chosen at /game/start.
+    model_id: str = ""
     message_count: int = 0
     money_confidence: int = 0
     religion_confidence: int = 0
@@ -92,8 +148,13 @@ class GameState(BaseModel):
     conversation_history: list[Turn] = Field(default_factory=list)
     game_status: GameStatus = "active"
     current: Presentation
+    #: The last few moods, so the engine can push him off a rut. He tends to
+    #: settle on one and stay there, which flattens the comedy.
+    recent_moods: list[str] = Field(default_factory=list)
     # Set by the engine when the ride ends, so the UI knows *why* it ended.
     end_reason: str | None = None
+    #: Abu Fadi's conclusion, filled in once the ride is over.
+    verdict: Verdict | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -129,7 +190,6 @@ class AISuggestion(BaseModel):
     question: str
     thinking: str = ""
     mood: Mood = DEFAULT_MOOD
-    driver_action: DriverAction = DEFAULT_DRIVER_ACTION
     radar_changes: RadarChanges = Field(default_factory=RadarChanges)
     money_confidence_change: int = 0
     religion_confidence_change: int = 0
@@ -147,12 +207,6 @@ class AISuggestion(BaseModel):
     def _safe_mood(cls, value: Any) -> str:
         text = str(value).strip().lower() if value is not None else ""
         return text if text in MOODS else DEFAULT_MOOD
-
-    @field_validator("driver_action", mode="before")
-    @classmethod
-    def _safe_action(cls, value: Any) -> str:
-        text = str(value).strip().lower() if value is not None else ""
-        return text if text in DRIVER_ACTIONS else DEFAULT_DRIVER_ACTION
 
     @field_validator("radar_changes", mode="before")
     @classmethod

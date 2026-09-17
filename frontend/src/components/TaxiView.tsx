@@ -5,45 +5,49 @@ import {
 } from "framer-motion";
 
 import abuFadi from "../assets/abu-fadi.jpeg";
-import type { DriverAction, Mood } from "../types";
+import type { Mood } from "../types";
 
 /**
  * The back seat of the taxi.
  *
- * There is one piece of art, so Abu Fadi's four reactions are built from
- * camera moves over it rather than separate frames: lean toward the mirror,
- * a slow nod, a greedy flare. Swap in real frames later and only
- * ACTION_MOTION needs to change.
+ * Mood is the only reaction signal - it drives both the colour of the cabin
+ * and what Abu Fadi's body does. There is one piece of art, so the five moods
+ * are camera moves over it rather than separate frames: a glance at the
+ * mirror, turning to study you, a greedy flare. Swap in real frames later and
+ * only MOOD_MOTION needs to change.
  *
  * The image itself is never animated into view - motion only ever transforms
  * something already on screen, so a dead animation layer costs a reaction,
  * not the scene.
  */
 
-const ACTION_MOTION: Record<DriverAction, TargetAndTransition> = {
+const MOOD_MOTION: Record<Mood, TargetAndTransition> = {
   // Just driving.
-  normal: { scale: 1, y: 0, filter: "brightness(1) saturate(1)" },
-  // Leaning in to study you in the rear-view.
-  mirror: { scale: 1.09, y: -4, filter: "brightness(1.08) saturate(1.05)" },
-  // Slow, knowing agreement.
-  nod: {
-    scale: 1.02,
-    y: [0, 7, 0, 5, 0],
-    filter: "brightness(1.02) saturate(1)",
-  },
+  neutral: { scale: 1, y: 0, filter: "brightness(1) saturate(1)" },
+  // A glance up at the mirror.
+  curious: { scale: 1.05, y: -3, filter: "brightness(1.05) saturate(1.05)" },
+  // Turning to properly study you.
+  suspicious: { scale: 1.12, y: -5, filter: "brightness(0.92) saturate(0.85)" },
   // He can smell money.
-  money: { scale: 1.06, y: -2, filter: "brightness(1.22) saturate(1.45)" },
+  excited: { scale: 1.08, y: -2, filter: "brightness(1.22) saturate(1.45)" },
+  // Slow, disappointed nod.
+  upset: {
+    scale: 1.02,
+    y: [0, 8, 0, 5, 0],
+    filter: "brightness(0.85) saturate(0.9)",
+  },
 };
 
 /*
  * Stepped timings, so a reaction lands in a handful of frames like a sprite
  * animation rather than gliding the way a modern UI would.
  */
-const ACTION_TRANSITION: Record<DriverAction, Transition> = {
-  normal: { duration: 0.35, ease: "linear" },
-  mirror: { duration: 0.25, ease: "linear" },
-  nod: { duration: 1.2, ease: "linear" },
-  money: { duration: 0.2, ease: "linear" },
+const MOOD_TRANSITION: Record<Mood, Transition> = {
+  neutral: { duration: 0.35, ease: "linear" },
+  curious: { duration: 0.3, ease: "linear" },
+  suspicious: { duration: 0.25, ease: "linear" },
+  excited: { duration: 0.2, ease: "linear" },
+  upset: { duration: 1.2, ease: "linear" },
 };
 
 /** A colour wash over the whole cabin. Kept low so the art still reads. */
@@ -57,23 +61,22 @@ const MOOD_WASH: Record<Mood, string> = {
 
 interface Props {
   mood: Mood;
-  action: DriverAction;
-  /** Changes every turn, so a reaction replays even if it repeats. */
+  /** Changes every turn, so a reaction replays even if the mood repeats. */
   turn: number;
 }
 
-export function TaxiView({ mood, action, turn }: Props) {
+export function TaxiView({ mood, turn }: Props) {
   return (
     <div className="relative aspect-[1024/682] max-h-[32vh] w-full shrink-0 overflow-hidden bg-black sm:max-h-[42vh] lg:max-h-[52vh]">
       {/* Idle engine vibration, always running. */}
       <div className="anim-idle absolute inset-0">
         <motion.img
-          key={`${action}-${turn}`}
+          key={`${mood}-${turn}`}
           src={abuFadi}
           alt="Abu Fadi driving, seen from the back seat"
           initial={false}
-          animate={ACTION_MOTION[action]}
-          transition={ACTION_TRANSITION[action]}
+          animate={MOOD_MOTION[mood]}
+          transition={MOOD_TRANSITION[mood]}
           style={{ originX: 0.36, originY: 0.42, imageRendering: "pixelated" }}
           className="h-full w-full object-cover object-[50%_26%]"
         />
@@ -97,7 +100,7 @@ export function TaxiView({ mood, action, turn }: Props) {
         className="crt-vignette pointer-events-none absolute inset-0"
       />
 
-      {action === "money" && <Kaching key={turn} />}
+      {mood === "excited" && <Kaching key={turn} />}
     </div>
   );
 }

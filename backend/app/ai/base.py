@@ -1,6 +1,6 @@
 """Provider-agnostic pieces: the interface, prompt assembly, JSON parsing.
 
-A new provider (Groq, OpenAI, whatever) only has to implement the HTTP call -
+A new provider only has to implement the HTTP call -
 prompt building and response validation are shared here.
 """
 
@@ -12,8 +12,8 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
-from ..models import AISuggestion, GameState
-from ..prompts import SYSTEM_PROMPT, build_briefing
+from ..models import AISuggestion, GameState, Verdict
+from ..prompts import SYSTEM_PROMPT, build_briefing, verdict_system
 
 
 class AIError(RuntimeError):
@@ -27,9 +27,17 @@ class AIProvider(Protocol):
         """Return Abu Fadi's next turn, or raise AIError."""
         ...
 
+    async def verdict(self, state: GameState) -> Verdict:
+        """Return his final theory once the ride is over, or raise AIError."""
+        ...
+
 
 def system_text(state: GameState) -> str:
     return SYSTEM_PROMPT + build_briefing(state)
+
+
+def verdict_text(state: GameState) -> str:
+    return verdict_system(state)
 
 
 def transcript(state: GameState) -> list[dict[str, str]]:
@@ -69,3 +77,13 @@ def parse_suggestion(raw: str) -> AISuggestion:
         return AISuggestion.model_validate(_extract_json(raw))
     except ValidationError as exc:
         raise AIError(f"response failed validation: {exc.error_count()} error(s)") from exc
+
+
+def parse_verdict(raw: str) -> Verdict:
+    """Untrusted text in, validated verdict out."""
+    try:
+        return Verdict.model_validate(_extract_json(raw))
+    except ValidationError as exc:
+        raise AIError(
+            f"verdict failed validation: {exc.error_count()} error(s)"
+        ) from exc

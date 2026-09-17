@@ -1,4 +1,4 @@
-import type { GameState } from "../types";
+import type { GameState, ModelOption } from "../types";
 
 /** Empty in dev - vite proxies /game to the backend. Set for deployment. */
 const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -38,7 +38,19 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export const startGame = () => post<GameState>("/game/start", {});
+export const startGame = (model?: string) =>
+  post<GameState>("/game/start", { model: model ?? null });
+
+/** The catalog of brains. Failing to load it is not fatal - the backend picks. */
+export async function fetchModels(): Promise<ModelOption[]> {
+  try {
+    const response = await fetch(`${BASE}/ai/models`);
+    if (!response.ok) return [];
+    return (await response.json()).models ?? [];
+  } catch {
+    return [];
+  }
+}
 
 export const sendAnswer = (sessionId: string, answer: string) =>
   post<GameState>("/game/answer", { session_id: sessionId, answer });

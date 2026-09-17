@@ -1,4 +1,6 @@
 import abuFadi from "../assets/abu-fadi.jpeg";
+import type { ModelOption } from "../types";
+import { ModelPicker } from "./ModelPicker";
 
 /**
  * Attract screen.
@@ -14,9 +16,19 @@ interface Props {
   onStart: () => void;
   starting: boolean;
   error: string | null;
+  models: ModelOption[];
+  model: string | undefined;
+  onModel: (id: string) => void;
 }
 
-export function TitleScreen({ onStart, starting, error }: Props) {
+export function TitleScreen({
+  onStart,
+  starting,
+  error,
+  models,
+  model,
+  onModel,
+}: Props) {
   return (
     <div className="relative flex h-full flex-col items-center justify-between overflow-hidden px-4 py-5 text-center sm:px-8 sm:py-8">
       {/* Marquee art, pushed right back so the logo stays legible. */}
@@ -61,7 +73,14 @@ export function TitleScreen({ onStart, starting, error }: Props) {
           </span>
         </p>
 
-        <div className="mt-1 flex flex-col items-center gap-2.5">
+        <div className="mt-1 flex flex-col items-center gap-3.5">
+          <ModelPicker
+            models={models}
+            value={model}
+            disabled={starting}
+            onChange={onModel}
+          />
+
           <button
             type="button"
             onClick={onStart}

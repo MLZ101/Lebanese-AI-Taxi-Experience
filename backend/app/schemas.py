@@ -12,7 +12,7 @@ from .engine import (
     MAX_MESSAGES,
     SOFT_END_MESSAGES,
 )
-from .models import DriverAction, GameState, GameStatus, Mood, Radar, Turn
+from .models import GameState, GameStatus, Mood, Radar, Turn, Verdict
 from .service import MAX_ANSWER_LENGTH
 
 
@@ -31,6 +31,8 @@ class DebugInfo(BaseModel):
 
 class PublicState(BaseModel):
     session_id: str
+    #: The model actually driving, after resolution.
+    model: str
     message_count: int
     max_messages: int = MAX_MESSAGES
     game_status: GameStatus
@@ -39,10 +41,11 @@ class PublicState(BaseModel):
     question: str
     thinking: str
     mood: Mood
-    driver_action: DriverAction
     history: list[Turn]
     #: True when the AI call failed and the scripted driver stood in.
     ai_degraded: bool = False
+    #: Abu Fadi's conclusion. Only present once the ride has ended.
+    verdict: Verdict | None = None
     #: Present only while EXPOSE_DEBUG is on. None in a real demo build.
     debug: DebugInfo | None = None
 
@@ -50,6 +53,7 @@ class PublicState(BaseModel):
     def from_state(cls, state: GameState, ai_degraded: bool = False) -> "PublicState":
         return cls(
             session_id=state.session_id,
+            model=state.model_id,
             message_count=state.message_count,
             game_status=state.game_status,
             end_reason=state.end_reason,
@@ -57,9 +61,9 @@ class PublicState(BaseModel):
             question=state.current.question,
             thinking=state.current.thinking,
             mood=state.current.mood,
-            driver_action=state.current.driver_action,
             history=state.conversation_history,
             ai_degraded=ai_degraded,
+            verdict=state.verdict,
             debug=(
                 DebugInfo(
                     money_confidence=state.money_confidence,
@@ -72,7 +76,9 @@ class PublicState(BaseModel):
 
 
 class StartRequest(BaseModel):
-    """Nothing needed yet - kept so the contract can grow without a breaking change."""
+    """Optional model choice. Unknown or keyless ids fall back to the default."""
+
+    model: str | None = Field(default=None, max_length=120)
 
 
 class AnswerRequest(BaseModel):
