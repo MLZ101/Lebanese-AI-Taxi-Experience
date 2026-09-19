@@ -10,10 +10,14 @@ from __future__ import annotations
 from .. import config
 from .base import AIError, AIProvider
 from .fallback import FallbackProvider
+from .azure_openai import AzureOpenAIProvider
 from .gemini import GeminiProvider
+from .openai_api import OpenAIProvider
 
-#: id must be Gemini's own model name - it is passed through verbatim.
-#: Notes come from measured 4-turn rides.
+#: id is the provider's own model name - it is passed through verbatim.
+#: Notes come from measured 4-turn rides. Dropped after measuring:
+#: gpt-5-mini (timed out 4/4), gpt-5.4-nano and gpt-5.6-luna both slip out of
+#: Latin letters into Arabic script mid-sentence, which breaks the look.
 MODELS: list[dict[str, str]] = [
     {
         "id": "gemini-3.5-flash-lite",
@@ -34,6 +38,30 @@ MODELS: list[dict[str, str]] = [
         "note": "bigger model",
     },
     {
+        "id": "gpt-5.4-mini",
+        "label": "GPT-5.4 mini",
+        "provider": "openai",
+        "note": "OpenAI, fastest of all (~1.3s)",
+    },
+    {
+        "id": "gpt-5.6-luna",
+        "label": "GPT-5.6 Luna",
+        "provider": "openai",
+        "note": "OpenAI, ~2.8s",
+    },
+    {
+        "id": "gpt-5.5",
+        "label": "GPT-5.5",
+        "provider": "openai",
+        "note": "OpenAI, best writing but slow (~8.5s)",
+    },
+    {
+        "id": "azure/gpt-5.5",
+        "label": "GPT-5.5 (Azure)",
+        "provider": "azure",
+        "note": "your Azure deployment",
+    },
+    {
         "id": "fallback",
         "label": "Scripted driver",
         "provider": "fallback",
@@ -43,13 +71,30 @@ MODELS: list[dict[str, str]] = [
 
 _KEYS = {
     "gemini": lambda: bool(config.GEMINI_API_KEY),
+    "openai": lambda: bool(config.OPENAI_API_KEY),
+    # A key alone points at nothing on Azure - we also need to know which
+    # resource and which deployment, from either the Target URI or the pieces.
+    "azure": lambda: bool(config.AZURE_OPENAI_API_KEY) and _azure_addressed(),
     "fallback": lambda: True,
 }
 
 _BUILDERS = {
     "gemini": lambda model: GeminiProvider(model=model),
+    "openai": lambda model: OpenAIProvider(model=model),
+    # The catalog id is just a label here - the deployment name comes from env.
+    "azure": lambda model: AzureOpenAIProvider(),
     "fallback": lambda model: FallbackProvider(),
 }
+
+
+def _azure_addressed() -> bool:
+    """Do we know the resource and the deployment, however they were given?"""
+    from .azure_openai import parse_target_uri
+
+    from_uri = parse_target_uri(config.AZURE_OPENAI_TARGET_URI)
+    endpoint = config.AZURE_OPENAI_ENDPOINT or from_uri.get("endpoint")
+    deployment = config.AZURE_OPENAI_DEPLOYMENT or from_uri.get("deployment")
+    return bool(endpoint and deployment)
 
 
 def is_available(entry: dict) -> bool:
@@ -60,6 +105,14 @@ def default_model_id() -> str:
     """The configured model, if it is one we know about."""
     if config.AI_PROVIDER == "fallback":
         return "fallback"
+    if config.AI_PROVIDER == "openai":
+        for entry in MODELS:
+            if entry["id"] == config.OPENAI_MODEL and is_available(entry):
+                return entry["id"]
+    if config.AI_PROVIDER == "azure":
+        azure = next(e for e in MODELS if e["provider"] == "azure")
+        if is_available(azure):
+            return azure["id"]
     for entry in MODELS:
         if entry["id"] == config.GEMINI_MODEL and is_available(entry):
             return entry["id"]

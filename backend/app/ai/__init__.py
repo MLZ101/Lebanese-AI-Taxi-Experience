@@ -2,6 +2,7 @@
 per-session choice made in the UI - see catalog.py."""
 
 from .. import config
+from .azure_openai import AzureOpenAIProvider
 from .base import AIError, AIProvider
 from .catalog import (
     MODELS,
@@ -13,12 +14,15 @@ from .catalog import (
 )
 from .fallback import FallbackProvider, canned_suggestion, canned_verdict
 from .gemini import GeminiProvider
+from .openai_api import OpenAIProvider
 
 __all__ = [
     "AIError",
     "AIProvider",
+    "AzureOpenAIProvider",
     "FallbackProvider",
     "GeminiProvider",
+    "OpenAIProvider",
     "MODELS",
     "canned_suggestion",
     "canned_verdict",
