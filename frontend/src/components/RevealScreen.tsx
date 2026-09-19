@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { Verdict } from "../types";
+import { CreditsPanel } from "./CreditsPanel";
 
 /**
  * The payoff.
@@ -116,6 +117,9 @@ export function RevealScreen({ verdict, turns, onRideAgain }: Props) {
       >
         ▶ TAKE ANOTHER TAXI
       </button>
+
+      {/* Credits last, the way the cabinet would roll them. */}
+      <CreditsPanel />
     </div>
   );
 }

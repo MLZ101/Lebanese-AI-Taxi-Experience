@@ -30,6 +30,10 @@
   --color-rust: #e0701f;
   --color-cedar: #2f7d3a;
   --color-bone: #e8e2cf;
+  /* Aged card stock. Dim enough that the credits' QR tiles sit in the cabinet
+     instead of glaring out of it, still ~10:1 against --color-cab so a phone
+     reads them without complaint. */
+  --color-parch: #cfc8ae;
   --color-dust: #9a9480;
 }
 

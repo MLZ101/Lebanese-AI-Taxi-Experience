@@ -204,6 +204,33 @@ same rule the rest of the UI follows: everything the player must *read* is
 animated in CSS with the base style already the finished state, so a broken
 animation layer can cost a flourish, never the game.
 
+## The staff roll
+
+The credits close the reveal, the way a cabinet would roll them: two LinkedIn
+QR codes on parchment tiles, framed and captioned in the same chrome as
+everything else. Each one is also a real link, so a desktop player can click
+rather than scan.
+
+The codes are **redrawn**, not embedded as supplied, and both reasons are
+functional:
+
+- The originals were mid-grey-ish colour on white (luminance ~140 against 255).
+  A decoder could not read them without a hard threshold first, which means a
+  phone would have struggled too. No CSS filter fixes that - contrast pivots
+  around mid-grey, so it pushes those modules *lighter*.
+- This project sets `image-rendering: pixelated` on every `img`. Shrinking a
+  1080px code to thumbnail size under nearest-neighbour drops modules outright.
+
+So `scratchpad/process-qr.mjs` reads the module grid out of each original and
+redraws it at a whole number of pixels per module in `--color-cab` on
+`--color-parch`, with the spec's four-module quiet zone baked into the image -
+which is why the tile behind it uses the same parchment and shows no edge.
+
+Both displayed widths (111px and 148px) are whole multiples of the 37-module
+grid, 3px and 4px a module. **Pick any other width and the blocks land on
+fractional pixels.** Both sizes were checked by decoding a screenshot of the
+rendered page, not the source file.
+
 ## API
 
 | Endpoint | Does |
@@ -246,7 +273,9 @@ frontend/src/components/   TitleScreen (the attract screen)
                            QuestionPanel (the dialogue box), AnswerInput,
                            HistoryLog
                            RevealScreen (the Tawa2ef payoff)
+                           CreditsPanel (the staff roll, after the payoff)
                            ModelPicker (which brain drives)
 frontend/src/assets/       abu-fadi.jpeg - the painting
                            excited-money.mp4, upset-suspicious.mp4 - reactions
+                           qr-jouni.png, qr-malli.png - the credits codes
 ```
